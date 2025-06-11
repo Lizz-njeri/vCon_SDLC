@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>vCon Project Analyzer</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/lucide-icons@0.171.0/dist/umd/lucide.min.js" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/lucide-icons@0.171.0/dist/umd/lucide.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.10.5/dist/cdn.min.js" defer></script>
+    <style>
+        .animate-spin {
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            from {
+                transform: rotate(0deg);
+            }
+            to {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
+    <div class="max-w-6xl mx-auto" x-data="{
+        activeTab: 'text',
+        transcript: '',
+        analysis: null,
+        isAnalyzing: false,
+        isProcessingMedia: false,
+        youtubeUrl: '',
+        uploadedFile: null,
+
+        loadSample() {
+            fetch('/sample-transcript')
+                .then(response => response.json())
+                .then(data => {
+                    this.transcript = data.transcript;
+                });
+        },
+
+        analyzeTranscript() {
+            if (!this.transcript.trim()) return;
+
+            this.isAnalyzing = true;
+
+            const formData = new FormData();
+            formData.append('transcript', this.transcript);
+
+            fetch('/analyze', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                this.analysis = data;
+                this.isAnalyzing = false;
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                this.isAnalyzing = false;
+                alert('Error analyzing transcript');
+            });
+        },
+
+        processYouTubeVideo() {
+            if (!this.youtubeUrl.trim()) return;
+
+            this.isProcessingMedia = true;
+
+            const formData = new FormData();
+            formData.append('youtube_url', this.youtubeUrl);
+
+            fetch('/process-youtube', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                this.transcript = data.transcript;
+                this.isProcessingMedia = false;
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                this.isProcessingMedia = false;
+                alert('Error processing YouTube video');
+            });
+        },
+
+        handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            this.uploadedFile = {
+                name: file.name,
+                type: file.type,
+                size: file.size
+            };
+
+            this.isProcessingMedia = true;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            fetch('/upload-file', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                this.transcript = data.transcript;
+                this.isProcessingMedia = false;
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                this.isProcessingMedia = false;
+                alert('Error processing file');
+            });
+        },
+
+        clearAll() {
+            this.transcript = '';
+            this.analysis = null;
+            this.youtubeUrl = '';
+            this.uploadedFile = null;
+            document.getElementById('file-upload').value = '';
+        },
+
+        formatFileSize(bytes) {
+            return (bytes / 1024 / 1024).toFixed(2) + ' MB';
+        }
+    }">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-800 mb-2">vCon Project Analyzer</h1>
+            <p class="text-gray-600 text-lg">Transform client conversations into actionable project plans</p>
+        </div>
+
+        <!-- Input Section -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-xl font-semibold text-gray-800 flex items-center">
+                    <i data-lucide="file-text" class="mr-2"></i>
+                    Data Input
+                </h2>
+                <button
+                    @click="clearAll"
+                    class="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors flex items-center"
+                >
+                    <i data-lucide="trash-2" class="w-4 h-4 mr-2"></i>
+                    Clear All
+                </button>
+            </div>
+
+            <!-- Tab Navigation -->
+            <div class="flex border-b border-gray-200 mb-6">
+                <button
+                    @click="activeTab = 'text'"
+                    :class="`px-4 py-2 font-medium rounded-t-lg transition-colors ${
+                        activeTab === 'text'
+                            ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
+                            : 'text-gray-600 hover:text-gray-800'
+                    }`"
+                >
+                    <i data-lucide="file-text" class="w-4 h-4 inline mr-2"></i>
+                    Text Input
+                </button>
+                <button
+                    @click="activeTab = 'youtube'"
+                    :class="`px-4 py-2 font-medium rounded-t-lg transition-colors ${
+                        activeTab === 'youtube'
+                            ? 'text-red-600 border-b-2 border-red-600 bg-red-50'
+                            : 'text-gray-600 hover:text-gray-800'
+                    }`"
+                >
+                    <i data-lucide="video" class="w-4 h-4 inline mr-2"></i>
+                    YouTube Link
+                </button>
+                <button
+                    @click="activeTab = 'upload'"
+                    :class="`px-4 py-2 font-medium rounded-t-lg transition-colors ${
+                        activeTab === 'upload'
+                            ? 'text-green-600 border-b-2 border-green-600 bg-green-50'
+                            : 'text-gray-600 hover:text-gray-800'
+                    }`"
+                >
+                    <i data-lucide="upload" class="w-4 h-4 inline mr-2"></i>
+                    File Upload
+                </button>
+            </div>
+
+            <!-- Text Input Tab -->
+            <div x-show="activeTab === 'text'">
+                <div class="flex justify-between items-center mb-4">
+                    <p class="text-gray-600">Paste your meeting transcript or conversation text</p>
+                    <button
+                        @click="loadSample"
+                        class="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors flex items-center"
+                    >
+                        <i data-lucide="file-text" class="w-4 h-4 mr-2"></i>
+                        Load Sample
+                    </button>
+                </div>
+                <textarea
+                    class="w-full h-48 p-4 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Paste your meeting transcript here..."
+                    x-model="transcript"
+                ></textarea>
+            </div>
+
+            <!-- YouTube Tab -->
+            <div x-show="activeTab === 'youtube'" class="space-y-4">
+                <div>
+                    <p class="text-gray-600 mb-4">Enter a YouTube URL to extract and analyze the conversation</p>
+                    <div class="flex gap-3">
+                        <div class="flex-1">
+                            <input
+                                type="url"
+                                class="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                                placeholder="https://www.youtube.com/watch?v=..."
+                                x-model="youtubeUrl"
+                            />
+                        </div>
+                        <button
+                            @click="processYouTubeVideo"
+                            :disabled="!youtubeUrl.trim() || isProcessingMedia"
+                            class="px-6 py-4 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center"
+                        >
+                            <template x-if="isProcessingMedia">
+                                <div class="flex items-center">
+                                    <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                    Processing...
+                                </div>
+                            </template>
+                            <template x-if="!isProcessingMedia">
+                                <div class="flex items-center">
+                                    <i data-lucide="video" class="w-4 h-4 mr-2"></i>
+                                    Process Video
+                                </div>
+                            </template>
+                        </button>
+                    </div>
+                </div>
+                <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-lg">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <svg class="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                            </svg>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm text-yellow-700">
+                                <strong>Demo Mode:</strong> This will simulate processing a YouTube video and generate sample transcript data for demonstration purposes.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- File Upload Tab -->
+            <div x-show="activeTab === 'upload'" class="space-y-4">
+                <div>
+                    <p class="text-gray-600 mb-4">Upload audio (MP3), video (MP4), or data files (JSON) for analysis</p>
+                    <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-gray-400 transition-colors">
+                        <input
+                            type="file"
+                            accept=".json,.mp3,.mp4,.wav,.m4a,.mov,.avi"
+                            @change="handleFileUpload"
+                            class="hidden"
+                            id="file-upload"
+                        />
+                        <label for="file-upload" class="cursor-pointer">
+                            <div class="flex flex-col items-center">
+                                <i data-lucide="upload" class="w-12 h-12 text-gray-400 mb-4"></i>
+                                <p class="text-lg font-medium text-gray-700 mb-2">
+                                    <span x-text="uploadedFile ? uploadedFile.name : 'Click to upload or drag and drop'"></span>
+                                </p>
+                                <p class="text-sm text-gray-500">
+                                    Supports: JSON, MP3, MP4, WAV, M4A, MOV, AVI
+                                </p>
+                            </div>
+                        </label>
+                    </div>
+
+                    <div x-show="uploadedFile" class="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                        <div class="flex items-center">
+                            <template x-if="uploadedFile && uploadedFile.type === 'application/json'">
+                                <i data-lucide="file" class="w-5 h-5 text-green-600 mr-2"></i>
+                            </template>
+                            <template x-if="uploadedFile && uploadedFile.type.startsWith('audio/')">
+                                <i data-lucide="music" class="w-5 h-5 text-green-600 mr-2"></i>
+                            </template>
+                            <template x-if="uploadedFile && uploadedFile.type.startsWith('video/')">
+                                <i data-lucide="video" class="w-5 h-5 text-green-600 mr-2"></i>
+                            </template>
+                            <div>
+                                <p class="font-medium text-green-800" x-text="uploadedFile && uploadedFile.name"></p>
+                                <p class="text-sm text-green-600">
+                                    <span x-text="uploadedFile && uploadedFile.type"></span> •
+                                    <span x-text="uploadedFile && formatFileSize(uploadedFile.size)"></span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-blue-50 border-l-4 border-blue-400 p-4 rounded-lg">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <svg class="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+                            </svg>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm text-blue-700">
+                                <strong>File Processing:</strong> Audio/video files will be transcribed to text, and JSON files will be parsed for conversation data. This demo generates sample transcripts based on file type.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Process Button -->
+            <div class="mt-6" x-show="transcript.trim() || (isProcessingMedia && !transcript)">
+                <button
+                    @click="analyzeTranscript"
+                    :disabled="!transcript.trim() || isAnalyzing"
+                    class="w-full px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center"
+                >
+                    <template x-if="isAnalyzing">
+                        <div class="flex items-center">
+                            <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                            Analyzing Conversation...
+                        </div>
+                    </template>
+                    <template x-if="!isAnalyzing">
+                        <div class="flex items-center">
+                            <i data-lucide="arrow-right" class="mr-2"></i>
+                            Generate Project Analysis
+                        </div>
+                    </template>
+                </button>
+            </div>
+        </div>
+
+        <!-- Analysis Results -->
+        <div class="space-y-6" x-show="analysis">
+            <!-- Tech Project Analysis -->
+            <template x-if="analysis && analysis.type === 'tech'">
+                <div class="space-y-6">
+                    <!-- Project Overview -->
+                    <div class="bg-white rounded-xl shadow-lg p-6">
+                        <h2 class="text-2xl font-semibold text-gray-800 mb-4">Project Overview</h2>
+                        <div class="grid md:grid-cols-3 gap-4">
+                            <div class="bg-blue-50 p-4 rounded-lg">
+                                <h3 class="font-medium text-blue-800 mb-2">Project Title</h3>
+                                <p class="text-blue-700" x-text="analysis.projectTitle"></p>
+                            </div>
+                            <div class="bg-green-50 p-4 rounded-lg">
+                                <h3 class="font-medium text-green-800 mb-2 flex items-center">
+                                    <i data-lucide="clock" class="w-4 h-4 mr-1"></i>
+                                    Timeline
+                                </h3>
+                                <p class="text-green-700" x-text="analysis.timeline"></p>
+                            </div>
+                            <div class="bg-purple-50 p-4 rounded-lg">
+                                <h3 class="font-medium text-purple-800 mb-2 flex items-center">
+                                    <i data-lucide="users" class="w-4 h-4 mr-1"></i>
+                                    Stakeholders
+                                </h3>
+                                <p class="text-purple-700" x-text="analysis.stakeholders.join(', ')"></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Requirements -->
+                    <div class="bg-white rounded-xl shadow-lg p-6">
+                        <h2 class="text-xl font-semibold text-gray-800 mb-4">Identified Requirements</h2>
+                        <div class="grid md:grid-cols-2 gap-2">
+                            <template x-for="(req, index) in analysis.requirements" :key="index">
+                                <div class="flex items-start p-3 bg-gray-50 rounded-lg">
+                                    <i data-lucide="check-square" class="w-4 h-4 text-green-600 mr-2 mt-0.5 flex-shrink-0"></i>
+                                    <span class="text-gray-700" x-text="req"></span>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- SDLC Timeline -->
+                    <div class="bg-white rounded-xl shadow-lg p-6">
+                        <h2 class="text-xl font-semibold text-gray-800 mb-6">SDLC Timeline & Tasks</h2>
+
+                        <template x-for="(phase, phaseIndex) in analysis.todos" :key="phaseIndex">
+                            <div class="mb-6 last:mb-0">
+                                <div class="flex items-center mb-3">
+                                    <div :class="`w-4 h-4 rounded-full bg-${phase.color}-500 mr-3`"></div>
+                                    <h3 class="text-lg font-semibold text-gray-800" x-text="phase.phase"></h3>
+                                    <span class="ml-auto text-sm text-gray-600 bg-gray-100 px-2 py-1 rounded" x-text="phase.duration"></span>
+                                </div>
+
+                                <div class="ml-7 space-y-2">
+                                    <template x-for="(task, taskIndex) in phase.tasks" :key="taskIndex">
+                                        <div class="flex items-start p-2 hover:bg-gray-50 rounded-lg transition-colors">
+                                            <div class="w-2 h-2 bg-gray-400 rounded-full mr-3 mt-2 flex-shrink-0"></div>
+                                            <span class="text-gray-700" x-text="task"></span>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+
+                    <!-- Risk Factors -->
+                    <div class="bg-white rounded-xl shadow-lg p-6">
+                        <h2 class="text-xl font-semibold text-gray-800 mb-4">Risk Factors & Considerations</h2>
+                        <div class="space-y-3">
+                            <template x-for="(risk, index) in analysis.riskFactors" :key="index">
+                                <div class="flex items-start p-3 bg-yellow-50 border-l-4 border-yellow-400 rounded-lg">
+                                    <div class="w-2 h-2 bg-yellow-500 rounded-full mr-3 mt-2 flex-shrink-0"></div>
+                                    <span class="text-yellow-800" x-text="risk"></span>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </template>
+
+            <!-- General Todo Analysis -->
+            <template x-if="analysis && analysis.type === 'general'">
+                <div class="space-y-6">
+                    <!-- Conversation Overview -->
+                    <div class="bg-white rounded-xl shadow-lg p-6">
+                        <h2 class="text-2xl font-semibold text-gray-800 mb-4">Conversation Summary</h2>
+                        <div class="grid md:grid-cols-3 gap-4">
+                            <div class="bg-indigo-50 p-4 rounded-lg">
+                                <h3 class="font-medium text-indigo-800 mb-2">Discussion Topic</h3>
+                                <p class="text-indigo-700" x-text="analysis.conversationTitle"></p>
+                            </div>
+                            <div class="bg-green-50 p-4 rounded-lg">
+                                <h3 class="font-medium text-green-800 mb-2 flex items-center">
+                                    <i data-lucide="clock" class="w-4 h-4 mr-1"></i>
+                                    Timeline
+                                </h3>
+                                <p class="text-green-700" x-text="analysis.timeline"></p>
+                            </div>
+                            <div class="bg-purple-50 p-4 rounded-lg">
+                                <h3 class="font-medium text-purple-800 mb-2 flex items-center">
+                                    <i data-lucide="users" class="w-4 h-4 mr-1"></i>
+                                    Participants
+                                </h3>
+                                <p class="text-purple-700" x-text="analysis.participants.join(', ')"></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Items -->
+                    <div class="bg-white rounded-xl shadow-lg p-6">
+                        <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                            <i data-lucide="check-square" class="mr-2"></i>
+                            Action Items
+                        </h2>
+                        <div class="space-y-3">
+                            <template x-for="(item, index) in analysis.actionItems" :key="index">
+                                <div class="flex items-start p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                                    <div class="flex items-center mr-3 mt-1">
+                                        <input type="checkbox" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500">
+                                    </div>
+                                    <span class="text-gray-700 flex-1" x-text="item"></span>
+                                    <span class="text-xs text-gray-500 bg-gray-200 px-2 py-1 rounded" x-text="`Item ${index + 1}`"></span>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- Categories -->
+                    <div class="bg-white rounded-xl shadow-lg p-6">
+                        <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                            <i data-lucide="tag" class="mr-2"></i>
+                            Categories
+                        </h2>
+                        <div class="flex flex-wrap gap-2">
+                            <template x-for="(category, index) in analysis.categories" :key="index">
+                                <span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium" x-text="category"></span>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- Priorities -->
+                    <div class="bg-white rounded-xl shadow-lg p-6">
+                        <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                            <i data-lucide="alert-circle" class="mr-2"></i>
+                            Priority Levels
+                        </h2>
+                        <div class="space-y-2">
+                            <template x-for="(priority, index) in analysis.priorities" :key="index">
+                                <div class="flex items-center p-2 rounded-lg" :class="{
+                                    'bg-red-50 border-l-4 border-red-400': priority.includes('High'),
+                                    'bg-yellow-50 border-l-4 border-yellow-400': priority.includes('Important'),
+                                    'bg-green-50 border-l-4 border-green-400': priority.includes('Low'),
+                                    'bg-blue-50 border-l-4 border-blue-400': priority.includes('Normal')
+                                }">
+                                    <div class="w-2 h-2 rounded-full mr-3" :class="{
+                                        'bg-red-500': priority.includes('High'),
+                                        'bg-yellow-500': priority.includes('Important'),
+                                        'bg-green-500': priority.includes('Low'),
+                                        'bg-blue-500': priority.includes('Normal')
+                                    }"></div>
+                                    <span class="font-medium" :class="{
+                                        'text-red-800': priority.includes('High'),
+                                        'text-yellow-800': priority.includes('Important'),
+                                        'text-green-800': priority.includes('Low'),
+                                        'text-blue-800': priority.includes('Normal')
+                                    }" x-text="priority"></span>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- Next Steps -->
+                    <div class="bg-white rounded-xl shadow-lg p-6">
+                        <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                            <i data-lucide="arrow-right" class="mr-2"></i>
+                            Next Steps
+                        </h2>
+                        <div class="space-y-3">
+                            <template x-for="(step, index) in analysis.nextSteps" :key="index">
+                                <div class="flex items-start p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border-l-4 border-blue-400">
+                                    <div class="flex items-center justify-center w-6 h-6 bg-blue-500 text-white rounded-full text-xs font-bold mr-3 mt-0.5" x-text="index + 1"></div>
+                                    <span class="text-gray-700" x-text="step"></span>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+        });
+    </script>
+</body>
+</html>
